@@ -12,15 +12,12 @@ import {
   MDBNavbarBrand,
   MDBNavbarToggler,
   MDBNavbarNav,
-  MDBNavbarItem,
-  MDBNavbarLink,
   MDBCollapse,
   MDBIcon,
   MDBDropdown,
   MDBDropdownToggle,
   MDBDropdownMenu,
   MDBDropdownItem,
-  MDBPagination,MDBPaginationItem,MDBPaginationLink, MDBBtn
 } from "mdb-react-ui-kit";
 
 function App() {
@@ -32,27 +29,48 @@ function App() {
     key: "id",
     direction: "ascending",
   });
-  const [currentPage, setcurrentPage] = useState(0);
-  const [pageLimit]=useState(10);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    loadUsersData(0,10,0);
-  }, []);
+    loadUsersData(currentPage);
+  }, [currentPage]);
 
-  const loadUsersData = async (start,end,increase) => {
+  useEffect(() => {
+    const handleScroll = () => {
+      if (
+        window.innerHeight + document.documentElement.scrollTop >=
+          document.documentElement.offsetHeight - 100 &&
+        !loading
+      ) {
+        setCurrentPage((prevPage) => prevPage + 1);
+      }
+    };
+
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [loading]);
+
+  const loadUsersData = async (page) => {
+    setLoading(true);
     try {
+      const start = (page - 1) * 10;
       const response = await axios.get(
-        `https://dummyjson.com/users?_start=${start}&_end=${end}`
+        `https://dummyjson.com/users?limit=10&skip=${start}`
       );
       if (response.data && Array.isArray(response.data.users)) {
-        setData(response.data.users);
+        const newUsers = response.data.users.filter(
+          (user) => !data.some((existingUser) => existingUser.id === user.id)
+        );
+        const sortedUsers = newUsers.sort((a, b) => a.id - b.id);
+        setData((prevData) => [...prevData, ...sortedUsers]);
       } else {
         console.error("Unexpected response structure", response.data);
-        setData([]);
       }
     } catch (err) {
       console.error("Error fetching data", err);
-      setData([]);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -89,21 +107,6 @@ function App() {
   const uniqueCountries = [
     ...new Set(data.map((item) => item.address.country)),
   ];
-
-  const renderPagination =() =>{
-    if(currentPage ===0){
-      return (
-        <MDBPagination className="mb-0">
-          <MDBPaginationItem>
-            <MDBPaginationLink>1</MDBPaginationLink>
-          </MDBPaginationItem>
-          <MDBDropdownItem>
-            <MDBBtn onClick={()=>loadUsersData(10,30,1)}>Next</MDBBtn>
-          </MDBDropdownItem>
-        </MDBPagination>
-      )
-    }
-  }
 
   return (
     <>
@@ -193,10 +196,6 @@ function App() {
             </MDBCol>
           </MDBRow>
 
-
-          <div>
-            {renderPagination}
-          </div>
           <MDBRow>
             <MDBCol size="12">
               <MDBTable>
@@ -258,6 +257,14 @@ function App() {
               </MDBTable>
             </MDBCol>
           </MDBRow>
+
+          {loading && (
+            <div className="text-center mt-4">
+              <div className="spinner-border" role="status">
+                <span className="visually-hidden">Loading...</span>
+              </div>
+            </div>
+          )}
         </div>
       </MDBContainer>
     </>
